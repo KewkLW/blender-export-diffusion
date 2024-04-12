@@ -14,6 +14,9 @@ import bpy
 from bpy_extras.io_utils import ImportHelper, ExportHelper
 from bpy.props import StringProperty, BoolProperty, EnumProperty, IntProperty, FloatProperty
 from bpy.types import Operator
+from math import degrees
+from math import isclose
+import json
 
 def roundZero(num, magnitude_thresh=0.00001):
     if abs(num) > magnitude_thresh:
@@ -112,4 +115,85 @@ def write_camera_data(context, filepath, start, end, cams, scale, output_camcode
     print("running write_camera_data...")
     outputString = cameras_to_string(context, start, end, cams, scale, output_camcode, output_json, output_raw_frames)
     with open(filepath, 'w', encoding='utf-8') as f:
-        f.write(f"Export frames {start}
+        f.write(f"Export frames {start} - {end}\n")
+        f.write(outputString)
+    return {'FINISHED'}
+
+class ExportDiffusionString(Operator, ExportHelper):
+    bl_idname = "export_scene.diffusion_string"
+    bl_label = "Export Diffusion String"
+
+    filename_ext = ".txt"
+
+    filter_glob: StringProperty(
+        default="*.txt",
+        options={'HIDDEN'},
+        maxlen=255,
+    )
+
+    start_frame: IntProperty(
+        name="Start Frame",
+        description="Starting frame for the export",
+        default=1,
+        min=1,
+        max=300000
+    )
+
+    end_frame: IntProperty(
+        name="End Frame",
+        description="End frame for the export",
+        default=250,
+        min=1,
+        max=300000
+    )
+
+    translation_scale: FloatProperty(
+        name="Position Scale",
+        description="Scales camera motion. Higher values make the camera move more",
+        default=1,
+        min=0,
+        max=1000
+    )
+
+    output_camcode: BoolProperty(
+        name="Output Camcode",
+        description="Output a code block formatted for use as a camcode input",
+        default=True
+    )
+
+    output_json: BoolProperty(
+        name="Output JSON",
+        description="Output a JSON formatted dictionary",
+        default=False
+    )
+
+    output_raw_frames: BoolProperty(
+        name="Output Raw Frames",
+        description="Output raw translation/rotation values for each frame for each axis",
+        default=False
+    )
+
+    def execute(self, context):
+        start = self.start_frame
+        end = self.end_frame
+        cams = context.selected_objects
+        scale = self.translation_scale
+        camcode = self.output_camcode
+        json_output = self.output_json
+        raw_frames = self.output_raw_frames
+        write_camera_data(context, self.filepath, start, end, cams, scale, camcode, json_output, raw_frames)
+        return {'FINISHED'}
+
+def menu_func_export(self, context):
+    self.layout.operator(ExportDiffusionString.bl_idname, text="Diffusion String (.txt)")
+
+def register():
+    bpy.utils.register_class(ExportDiffusionString)
+    bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
+
+def unregister():
+    bpy.utils.unregister_class(ExportDiffusionString)
+    bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
+
+if __name__ == "__main__":
+    register()
